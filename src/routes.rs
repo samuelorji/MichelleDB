@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use actix_web::{HttpRequest, HttpResponse, Responder, web, get,post};
+use actix_web::error;
 use actix_web::web::Json;
-use serde::de::Unexpected::Str;
 use serde_json::Value;
 use crate::db::DB;
 use serde_json::json;
@@ -23,6 +23,10 @@ impl<V> DocumentResponse<V>
             status: "ok",
         }
     }
+}
+#[derive(Debug,Deserialize)]
+struct QueryParams {
+    q: String
 }
 
 pub async fn greet(req: HttpRequest) -> HttpResponse {
@@ -64,4 +68,12 @@ pub async fn getById(req: HttpRequest, id: web::Path<String>, db: web::Data<DB>)
         None => HttpResponse::NotFound()
             .finish()
     }
+}
+#[get("/docs")]
+pub async fn getDoc(req:HttpRequest, query : web::Query<QueryParams>) -> impl Responder {
+
+    HttpResponse::Ok()
+        .body(format!("received query is {:?}",query))
+       // .finish()
+
 }
