@@ -1,6 +1,10 @@
+use std::collections::HashMap;
 use std::ffi::OsString;
+use std::iter::Filter;
 use std::path::Path;
 use serde::de::Unexpected::Str;
+use serde_json::Value;
+use walkdir::{IntoIter, WalkDir};
 
 use tokio::io;
 
@@ -9,6 +13,7 @@ pub struct DB {
     indexDir: String
 }
 
+pub type Document = HashMap<String,Value>;
 impl DB {
     pub fn new() -> io::Result<DB> {
 
@@ -39,6 +44,14 @@ impl DB {
             Ok(contents) => unsafe { Some(String::from_utf8_unchecked(contents)) },
             Err(e) => None,
         }
+    }
+
+    pub fn documents(&self) -> WalkDir {
+       WalkDir::new(&self.dbDir)
+            // .into_iter()
+            // .filter(|e| {
+            //     e.is_ok() && Path::new(e.unwrap().path()).is_dir()
+            // })
     }
 
 }

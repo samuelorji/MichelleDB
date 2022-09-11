@@ -1,11 +1,79 @@
+use std::collections::HashMap;
 use std::io;
 use std::io::Error;
+use std::str::FromStr;
+use serde_json::Value;
 
 #[derive(PartialEq,Debug)]
 pub struct QueryComparison<'a> {
     key: Vec<&'a str>,
     value :&'a str,
     op: QueryOp
+}
+
+impl<'a> QueryComparison<'a> {
+    pub fn matches_document(&self, document : &Value) -> bool {
+        let keys = &self.key;
+        let mut result= &Value::Null;
+        for key in keys {
+            if(result.is_null()) {
+                result = &document[*key]
+            } else {
+                result = &result[*key]
+            }
+        }
+        if(result.is_null()){
+            false
+        } else {
+            let value = &self.value;
+            match self.op {
+                QueryOp::Equal => {
+                    match result {
+                        Value::Number(number) => {
+                            if let Some(n) = number.as_f64() {
+                                f64::from_str(*value).unwrap() == n
+                            } else {
+                                false
+                            }
+                        }
+                        Value::String(s) => {
+                            s == *value
+                        }
+                        // any other type of value should be false
+                        _ => false
+                    }
+                }
+                QueryOp::Greater => {
+                    match result {
+                        Value::Number(number) => {
+                            if let Some(n) = number.as_f64() {
+                                n > f64::from_str(*value).unwrap()
+                            } else {
+                                false
+                            }
+                        }
+                        // any other type of value should be false
+                        _ => false
+                    }
+                }
+                QueryOp::Less => {
+                    println!("less");
+                    match result {
+                        Value::Number(number) => {
+                            if let Some(n) = number.as_f64() {
+                               n < f64::from_str(*value).unwrap()
+                            } else {
+                                false
+                            }
+                        }
+                        // any other type of value should be false
+                        _ => false
+                    }
+                }
+            }
+
+        }
+    }
 }
 
 #[derive(PartialEq,Debug)]
@@ -119,6 +187,7 @@ pub fn parseQuery<'a>(query : &'a[u8]) -> Result<Vec<QueryComparison<'a>>,  Stri
 
 mod test {
     use serde::de::Unexpected::Str;
+    use serde_json::{json, Value};
     use crate::lexer::{lexString, parseQuery, QueryComparison, QueryOp};
 
     #[test]
@@ -190,6 +259,25 @@ mod test {
         for testCase in &testCases {
             assert_eq!(parseQuery(testCase.query), testCase.expectedResult)
         }
+    }
+
+    #[test]
+    fn test_query_comparison_matcher(){
+        let queryComparison = QueryComparison {
+            key: vec!["a","b"],
+            value: "2",
+            op: QueryOp::Greater
+        };
+
+        let document: Value = json!( {
+            "a": {
+                "b": 3
+            }
+            }
+        );
+
+        let result = queryComparison.matches_document(&document);
+        println!("{}",result);
 
     }
 }
