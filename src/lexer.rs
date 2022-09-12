@@ -3,6 +3,7 @@ use std::io;
 use std::io::Error;
 use std::str::FromStr;
 use serde_json::Value;
+use serde::Serialize;
 
 #[derive(PartialEq,Debug)]
 pub struct QueryComparison<'a> {
@@ -43,40 +44,84 @@ impl<'a> QueryComparison<'a> {
                         _ => false
                     }
                 }
-                QueryOp::Greater => {
+                x => {
                     match result {
                         Value::Number(number) => {
                             if let Some(n) = number.as_f64() {
-                                n > f64::from_str(*value).unwrap()
+                                match x {
+                                    QueryOp::Greater => {
+                                        n > f64::from_str(*value).unwrap()
+                                    },
+                                    QueryOp::Less => {
+                                        n < f64::from_str(*value).unwrap()
+                                    },
+                                    _ => false
+                                }
                             } else {
                                 false
                             }
-                        }
+                        },
+                        Value::String(s) => {
+                            match (f64::from_str(*value), f64::from_str(&s)) {
+                                (Ok(a), Ok(b)) => {
+                                    match x {
+                                        QueryOp::Greater => {
+                                            a > b
+                                        },
+                                        QueryOp::Less => {
+                                           a < b
+                                        },
+                                        _ => false
+                                    }
+                                }
+                                _ => false
+                            }
+
+                        },
                         // any other type of value should be false
                         _ => false
                     }
                 }
-                QueryOp::Less => {
-                    println!("less");
-                    match result {
-                        Value::Number(number) => {
-                            if let Some(n) = number.as_f64() {
-                               n < f64::from_str(*value).unwrap()
-                            } else {
-                                false
-                            }
-                        }
-                        // any other type of value should be false
-                        _ => false
-                    }
-                }
+                // _ => false
+                // QueryOp::Greater => {
+                //     match result {
+                //         Value::Number(number) => {
+                //             if let Some(n) = number.as_f64() {
+                //                 n > f64::from_str(*value).unwrap()
+                //             } else {
+                //                 false
+                //             }
+                //         }
+                //         // any other type of value should be false
+                //         _ => false
+                //     }
+                // }
+                // QueryOp::Less => {
+                //     match result {
+                //         Value::Number(number) => {
+                //             if let Some(n) = number.as_f64() {
+                //                n < f64::from_str(*value).unwrap()
+                //             } else {
+                //                 false
+                //             }
+                //         }
+                //         // any other type of value should be false
+                //         _ => false
+                //     }
+                // }
             }
 
         }
     }
 }
 
-#[derive(PartialEq,Debug)]
+#[derive(Serialize)]
+pub struct DocumentResult {
+    pub id: String,
+    pub body: Value
+}
+
+#[derive(PartialEq,Debug,Copy,Clone)]
 enum QueryOp {
     Equal,
     Greater,

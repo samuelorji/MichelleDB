@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use actix_web::{HttpRequest, HttpResponse, Responder, web, get,post};
+use actix_web::dev::ResourcePath;
 use actix_web::error;
 use actix_web::web::Json;
-use serde_json::Value;
+use serde_json::{Number, Value};
 use crate::db::DB;
 use serde_json::json;
 use serde::{Deserialize, Serialize};
-use crate::lexer::{parseQuery, QueryComparison};
+use crate::lexer::{DocumentResult, parseQuery, QueryComparison};
 use crate::db::Document;
 
 #[derive(Serialize)]
@@ -86,7 +87,7 @@ pub async fn getById(req: HttpRequest, id: web::Path<String>, db: web::Data<DB>)
 #[get("/docs")]
 pub async fn getDoc(req:HttpRequest, query : web::Query<QueryParams>,db : web::Data<DB>) -> impl Responder {
 
-    let mut documentsResult : Vec<Value> = Vec::new();
+    let mut documentsResults : Vec<DocumentResult> = Vec::new();
     match parseQuery(query.q.as_bytes()) {
         Ok(queryComparisons) => {
 
@@ -100,34 +101,33 @@ pub async fn getDoc(req:HttpRequest, query : web::Query<QueryParams>,db : web::D
                 }) {
                 match documents {
                     Ok(filePath) => {
-                        println!("file path is {:?}",&filePath.path());
                         match   std::fs::read(filePath.path()) {
                             Ok(bytes) => {
                                 match serde_json::from_str::<Value>(unsafe { std::str::from_utf8_unchecked(&bytes)}) {
                                     Ok(document) => {
-                                        for queryComparison in &queryComparisons {
-                                            if queryComparison.matches_document(&document) {
-                                                documentsResult.push(document);
-                                                break;
-                                            }
+                                        let  is_match = queryComparisons.iter().all(|queryComparison| queryComparison.matches_document(&document));
+                                        if(is_match) {
+                                            let documentResult = DocumentResult {
+                                                id: String::from(filePath.path().file_name().unwrap().to_str().unwrap()),
+                                                body: document
+                                            };
+                                            documentsResults.push(documentResult)
                                         }
-
-                                        HttpResponse::InternalServerError().finish();
                                     }
                                     Err(e) => {
-                                        println!("error 1: {:?}",e);
+                                        println!("Serde failed: {:?}",e);
                                         return HttpResponse::InternalServerError().finish()
                                     }
                                 }
                             }
                             Err(e) => {
-                                println!("error 2 {:?}",e);
+                                println!("File read failed: {:?}",e);
                                 return HttpResponse::InternalServerError().finish()
                             }
                         }
                     }
                     Err(e) => {
-                        println!("error 3: {:?}",e);
+                        println!("can't open directory {:?}",e);
                        return HttpResponse::InternalServerError().finish()
                     }
                 }
@@ -139,12 +139,12 @@ pub async fn getDoc(req:HttpRequest, query : web::Query<QueryParams>,db : web::D
                 .body(e)
         }
     };
+   let res =  DocumentResponse::<Value>::from_Map(
+       HashMap::from([
+           (String::from("count"), Value::Number(Number::from(documentsResults.len()))),
+           (String::from("documents"), json!(documentsResults))
+       ])
+   );
 
-
-    println!("documents are {:?}", documentsResult);
-
-   return  HttpResponse::Ok()
-        .json(documentsResult)
-       // .finish()
-
+    HttpResponse::Ok().json(res)
 }
