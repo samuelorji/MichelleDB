@@ -99,6 +99,7 @@ pub async fn getDoc(req:HttpRequest, query : web::Query<QueryParams>,db : web::D
                         false
                     }
                 }) {
+
                 match documents {
                     Ok(filePath) => {
                         match   std::fs::read(filePath.path()) {

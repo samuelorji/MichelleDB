@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::io;
 use std::io::Error;
+
 use std::str::FromStr;
-use serde_json::Value;
+use serde_json::{Value,Map};
 use serde::Serialize;
 
 #[derive(PartialEq,Debug)]
@@ -82,33 +83,6 @@ impl<'a> QueryComparison<'a> {
                         _ => false
                     }
                 }
-                // _ => false
-                // QueryOp::Greater => {
-                //     match result {
-                //         Value::Number(number) => {
-                //             if let Some(n) = number.as_f64() {
-                //                 n > f64::from_str(*value).unwrap()
-                //             } else {
-                //                 false
-                //             }
-                //         }
-                //         // any other type of value should be false
-                //         _ => false
-                //     }
-                // }
-                // QueryOp::Less => {
-                //     match result {
-                //         Value::Number(number) => {
-                //             if let Some(n) = number.as_f64() {
-                //                n < f64::from_str(*value).unwrap()
-                //             } else {
-                //                 false
-                //             }
-                //         }
-                //         // any other type of value should be false
-                //         _ => false
-                //     }
-                // }
             }
 
         }
@@ -172,6 +146,44 @@ pub fn lexString(input : &[u8], mut index : usize) -> Result<(&str, usize), (&st
     }
 }
 
+pub fn get_path_values(document: Map<String,Value>, prefix : String) -> Vec<String> {
+    let mut pv : Vec<String>= Vec::new();
+    fn go(doc: &Map<String,Value>, pref : &String, pv : &mut Vec<String>)  {
+        for (key,value) in doc {
+            match value {
+                Value::Array(_) => {
+                    continue
+                }
+                Value::Object(o) => {
+                    let prefix = if(pref.is_empty()){
+                        String::from(key)
+                    } else {
+                        format!("{}.{}",&pref,&key)
+                    };
+                    go(o,&prefix,pv)
+                }
+                _ => {
+                    let mut u_key = String::new();
+                    if(!pref.is_empty()){
+                        u_key = format!("{}.{}",&pref,&key);
+                    }
+                    else {
+                        u_key = key.clone();
+                    }
+
+                    if let Some(s) = value.as_str() {
+                        pv.push(format!("{}={}",&u_key, s));
+                    } else {
+                        pv.push(format!("{}={}",&u_key, value));
+                    }
+                }
+            }
+        }
+    }
+    go(&document, &prefix,&mut pv);
+    pv
+
+}
 pub fn parseQuery<'a>(query : &'a[u8]) -> Result<Vec<QueryComparison<'a>>,  String> {
 
     // empty query check done in service layer
@@ -233,7 +245,7 @@ pub fn parseQuery<'a>(query : &'a[u8]) -> Result<Vec<QueryComparison<'a>>,  Stri
 mod test {
     use serde::de::Unexpected::Str;
     use serde_json::{json, Value};
-    use crate::lexer::{lexString, parseQuery, QueryComparison, QueryOp};
+    use super::*;
 
     #[test]
     fn test_lexing(){
@@ -324,5 +336,44 @@ mod test {
         let result = queryComparison.matches_document(&document);
         println!("{}",result);
 
+    }
+
+    #[test]
+    fn test_get_path_values(){
+        let jsonValue  = json!({
+            "a": 1,
+            "b" : {
+                "c" : {
+                    "d" : {
+                        "e" : 1,
+                        "f" : 3
+                    }
+                },
+                "g":"2"
+            }
+        });
+
+        let parsed = serde_json::from_value::<Map<String,Value>>(jsonValue).unwrap();
+
+        let result = get_path_values(parsed,String::new());
+
+        let expectedResult: Vec<String> = vec!["a=1", "b.c.d.e=1", "b.c.d.f=3", "b.g=2"].iter().map(|x| String::from(*x)).collect();
+
+        assert_eq!(expectedResult,result);
+        let jsonValue  = json!({
+            "a": 1,
+            "b" : "2",
+            "c": {
+                "d" : "3"
+            }
+        });
+
+        let parsed = serde_json::from_value::<Map<String,Value>>(jsonValue).unwrap();
+
+        let result = get_path_values(parsed,String::new());
+
+        let expectedResult: Vec<String> = vec!["a=1", "b=2", "c.d=3"].iter().map(|x| String::from(*x)).collect();
+
+        assert_eq!(expectedResult,result);
     }
 }
