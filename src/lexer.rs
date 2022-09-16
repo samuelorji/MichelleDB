@@ -5,23 +5,33 @@ use std::io::Error;
 use std::str::FromStr;
 use serde_json::{Value,Map};
 use serde::Serialize;
+use crate::Document;
 
 #[derive(PartialEq,Debug)]
 pub struct QueryComparison<'a> {
-    key: Vec<&'a str>,
-    value :&'a str,
-    op: QueryOp
+    pub key: Vec<&'a str>,
+    pub value :&'a str,
+    pub op: QueryOp
 }
 
 impl<'a> QueryComparison<'a> {
-    pub fn matches_document(&self, document : &Value) -> bool {
+    pub fn matches_document(&self, document : &Document) -> bool {
         let keys = &self.key;
         let mut result= &Value::Null;
         for key in keys {
             if(result.is_null()) {
-                result = &document[*key]
+                if let Some(inner) =  document.get(*key) {
+                    result = inner
+                } else {
+                    return  false
+                }
+
             } else {
-                result = &result[*key]
+                if let Some(inner) = result.get(*key) {
+                    result = inner
+                } else {
+                    return false
+                }
             }
         }
         if(result.is_null()){
@@ -63,8 +73,9 @@ impl<'a> QueryComparison<'a> {
                             }
                         },
                         Value::String(s) => {
-                            match (f64::from_str(*value), f64::from_str(&s)) {
+                            match (f64::from_str(&s),f64::from_str(*value)) {
                                 (Ok(a), Ok(b)) => {
+                                    println!("value is {} and expected is {}, queryop is {:?} ",value,s, &x);
                                     match x {
                                         QueryOp::Greater => {
                                             a > b
@@ -96,7 +107,7 @@ pub struct DocumentResult {
 }
 
 #[derive(PartialEq,Debug,Copy,Clone)]
-enum QueryOp {
+pub enum QueryOp {
     Equal,
     Greater,
     Less
@@ -146,12 +157,13 @@ pub fn lexString(input : &[u8], mut index : usize) -> Result<(&str, usize), (&st
     }
 }
 
-pub fn get_path_values(document: Map<String,Value>, prefix : String) -> Vec<String> {
+pub fn get_path_values(document: &Map<String,Value>, prefix : String) -> Vec<String> {
     let mut pv : Vec<String>= Vec::new();
     fn go(doc: &Map<String,Value>, pref : &String, pv : &mut Vec<String>)  {
         for (key,value) in doc {
             match value {
                 Value::Array(_) => {
+                    // not supported
                     continue
                 }
                 Value::Object(o) => {
@@ -333,7 +345,7 @@ mod test {
             }
         );
 
-        let result = queryComparison.matches_document(&document);
+        let result = queryComparison.matches_document(document.as_object().unwrap());
         println!("{}",result);
 
     }
@@ -355,7 +367,7 @@ mod test {
 
         let parsed = serde_json::from_value::<Map<String,Value>>(jsonValue).unwrap();
 
-        let result = get_path_values(parsed,String::new());
+        let result = get_path_values(&parsed,String::new());
 
         let expectedResult: Vec<String> = vec!["a=1", "b.c.d.e=1", "b.c.d.f=3", "b.g=2"].iter().map(|x| String::from(*x)).collect();
 
@@ -370,7 +382,7 @@ mod test {
 
         let parsed = serde_json::from_value::<Map<String,Value>>(jsonValue).unwrap();
 
-        let result = get_path_values(parsed,String::new());
+        let result = get_path_values(&parsed,String::new());
 
         let expectedResult: Vec<String> = vec!["a=1", "b=2", "c.d=3"].iter().map(|x| String::from(*x)).collect();
 
