@@ -51,7 +51,15 @@ impl DB {
                     .and_then(|e| serde_json::from_str::<Document>(&e).map(|doc| Some(doc))
                         .map_err(|e| e.to_string()))
             },
-            Err(e) => Err(e.to_string()),
+            Err(e) => {
+                //Err(e.to_string())
+                // Err(e) => Err(e.to_string()),
+                if (e.kind() == ErrorKind::NotFound) {
+                    Ok(None)
+                } else {
+                    Err(e.to_string())
+                }
+            }
         }
     }
 

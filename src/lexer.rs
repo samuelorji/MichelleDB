@@ -75,7 +75,6 @@ impl<'a> QueryComparison<'a> {
                         Value::String(s) => {
                             match (f64::from_str(&s),f64::from_str(*value)) {
                                 (Ok(a), Ok(b)) => {
-                                    println!("value is {} and expected is {}, queryop is {:?} ",value,s, &x);
                                     match x {
                                         QueryOp::Greater => {
                                             a > b
