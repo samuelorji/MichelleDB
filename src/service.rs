@@ -20,7 +20,8 @@ use crate::db::Document;
 use serde_json::Map;
 use walkdir::{Error, WalkDir};
 
-pub struct Service {}
+pub struct Service {
+}
 
 
 #[derive(Serialize)]
@@ -71,7 +72,7 @@ impl QueryParams {
 impl Service {
 
     pub fn reIndex(db: &DB) -> Option<String> {
-        let db = Arc::new(db);
+       // let db = Arc::new(db);
         for documents in db.documents().into_iter()
             .filter(|e| { if let Ok(dir) = e {!dir.path().is_dir()} else {false} }) {
             let result = documents
@@ -80,7 +81,7 @@ impl Service {
                     std::fs::read(filePath.path()).and_then(|bytes| {
                         serde_json::from_str::<Document>(unsafe { std::str::from_utf8_unchecked(&bytes) }).map_err(|e| e.to_string()).and_then(|document| {
                             let file_name = filePath.path().file_name().and_then(|osStr| osStr.to_str()).unwrap();
-                            Self::index(file_name, &document, &db)
+                            Self::index(file_name, &document, db)
                         }).map_err(|e|io::Error::from(ErrorKind::InvalidData) )
                     })
                 });
@@ -125,13 +126,14 @@ impl Service {
 
         Ok(())
     }
-    pub fn addDoc(document: web::Json<Document>, db: web::Data<DB>) -> io::Result<DocumentResponse> {
+    pub fn addDoc(document: web::Json<Document>,  db: web::Data<DB>) -> io::Result<DocumentResponse> {
         let uuid = uuid::Uuid::new_v4();
         match serde_json::to_string(&document) {
             Ok(content) => {
                 let uuidString = uuid.to_string();
-                let db = db.into_inner();
-                match Service::index(&uuidString, &document.0, &db) {
+
+                let indexResult = Service::index(&uuidString, &document.0, &db);
+                match indexResult {
                     Ok(_) => {
                         match db.clone().write_document(&uuidString, content) {
                             Ok(_) => {
