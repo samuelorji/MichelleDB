@@ -42,11 +42,7 @@ pub async fn addDoc(req: HttpRequest, document: web::Json<Document>, db: web::Da
 #[get("/docs/{id}")]
 pub async fn getById(req: HttpRequest, id: web::Path<String>, db: web::Data<DB>) -> impl Responder {
     match Service::getDocumentById(&id.into_inner(),db) {
-        Ok(doc) => {
-            let emptyDocument = Map::new();
-            let document = doc.unwrap_or(emptyDocument);
-            HttpResponse::Ok().json(DocumentResponse::from_Map(document))
-        }
+        Ok(doc) =>  HttpResponse::Ok().json(doc),
         Err(e) => {
             println!("{:?}", e);
             HttpResponse::InternalServerError().finish()

@@ -31,7 +31,14 @@ pub struct DocumentResponse {
 
 impl DocumentResponse
 {
-    pub fn from_Map(result: Map<String, Value>) -> Self {
+    pub fn from_Map(id :&str, result: Map<String, Value>) -> Self {
+        Self::fromDocumentResult(DocumentResult{
+            id : id.to_string(),
+            body: json!(result)
+        })
+    }
+
+    pub fn fromDocumentResult(result : DocumentResult) -> Self {
         Self {
             body: json!(result),
             status: "ok",
@@ -149,8 +156,13 @@ impl Service {
         }
     }
 
-    pub fn getDocumentById(id : &str, db : web::Data<DB>) -> Result<Option<Document>,String> {
+    pub fn getDocumentById(id : &str, db : web::Data<DB>) -> Result<DocumentResponse,String> {
         db.getById(id)
+            .map(|resp| resp.map(|doc| DocumentResponse::from_Map(id, doc)).unwrap_or_else(|| {
+                let emptyDocument = Map::new();
+                DocumentResponse::from_Map(&id, emptyDocument)
+            }))
+
     }
 
     pub fn getDocuments(query: web::Query<QueryParams>, db: web::Data<DB>) -> Result<Result<DocumentResponse,String>, String> {
