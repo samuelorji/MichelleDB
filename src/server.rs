@@ -1,10 +1,11 @@
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use serde_json::Error;
 use std::io;
 use std::io::ErrorKind;
 use std::iter::Map;
 use std::net::TcpListener;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use actix_web::{App, HttpServer, web,error,HttpResponse};
 use actix_web::dev::{ Server as WebServer};
 use serde::Deserialize;
@@ -15,7 +16,7 @@ use crate::service::Service;
 
 pub struct Server {}
 impl Server {
-    pub fn new(listener : TcpListener,db:DB) -> io::Result<WebServer> {
+    pub fn new(listener : TcpListener,db :DB) -> io::Result<WebServer> {
 
         #[cfg(feature = "re_index")] {
             println!("reindexing");
